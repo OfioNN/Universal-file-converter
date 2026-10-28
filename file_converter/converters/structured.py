@@ -1,7 +1,7 @@
 import csv
 import json
 from pathlib import Path
-
+from file_converter.errors import ConversionError
 
 def csv_to_json(source: Path, output_dir: Path) -> Path:
     target = output_dir / f"{source.stem}.json"
@@ -21,7 +21,20 @@ def json_to_csv(source: Path, output_dir: Path) -> Path:
     target = output_dir / f"{source.stem}.csv"
 
     with open(source, encoding="utf-8-sig") as source_file:
-        rows = json.load(source_file)
+        try:
+            rows = json.load(source_file)
+        except json.JSONDecodeError as error:
+            raise ConversionError(
+                f"Plik {source.name} nie jest poprawnym JSON-em "
+                f"(linia {error.lineno}, kolumna {error.colno}). "
+                "Popraw składnię pliku i spróbuj ponownie."
+            ) from error
+
+    if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
+        raise ConversionError(
+            f"Plik {source.name} ma niepoprawną strukturę: oczekiwano listy obiektów. "
+            "Zapisz dane w formacie opisanym w README."
+        )
 
     fieldnames = []
     for row in rows:
