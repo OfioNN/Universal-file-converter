@@ -1,0 +1,4 @@
+Zażółć gęślą jaźń
+To jest pierwszy akapit z polskimi znakami: ąćęłńóśźż ĄĆĘŁŃÓŚŹŻ.
+
+To jest drugi akapit po pustej linii.

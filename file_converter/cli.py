@@ -3,11 +3,14 @@ import sys
 from pathlib import Path
 
 from file_converter.converters.structured import csv_to_json, json_to_csv
+from file_converter.converters.text import docx_to_txt, txt_to_docx
 from file_converter.errors import ConversionError
 
 CONVERTERS = {
     (".csv", ".json"): csv_to_json,
     (".json", ".csv"): json_to_csv,
+    (".txt", ".docx"): txt_to_docx,
+    (".docx", ".txt"): docx_to_txt,
 }
 
 
