@@ -1,10 +1,15 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+import logging
+import time
+
 from file_converter.converters.office import document_to_pdf
 from file_converter.converters.structured import csv_to_json, json_to_csv
 from file_converter.converters.text import docx_to_txt, txt_to_docx
 from file_converter.errors import ConversionError
+
+logger = logging.getLogger(__name__)
 
 REGISTRY = {
     (".csv", ".json"): csv_to_json,
@@ -53,13 +58,25 @@ class ConversionRequest:
 
 
 def execute(request: ConversionRequest) -> Path:
-    request.validate()
-    convert = REGISTRY[(request.source.suffix.lower(), request.target_format)]
+    description = f"{request.source} -> {request.target_format}"
+    started = time.perf_counter()
 
     try:
-        return convert(request.source, request.output_dir)
+        request.validate()
+        convert = REGISTRY[(request.source.suffix.lower(), request.target_format)]
+        target = convert(request.source, request.output_dir)
     except PermissionError as error:
+        logger.error(f"{description}: brak dostępu ({error})")
         raise ConversionError(
             f"Brak dostępu do pliku {request.target_path.name}. Zamknij go, jeśli jest otwarty "
             "w innym programie (np. w Excelu), albo wybierz inny folder."
         ) from error
+    except ConversionError as error:
+        logger.error(f"{description}: {error}")
+        raise
+    except Exception:
+        logger.exception(f"{description}: nieoczekiwany błąd")
+        raise
+
+    logger.info(f"{description}: utworzono {target} w {time.perf_counter() - started:.2f} s")
+    return target

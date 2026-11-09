@@ -2,11 +2,14 @@ import argparse
 import sys
 from pathlib import Path
 
+from file_converter.log_config import configure_logging
 from file_converter.errors import ConversionError
 from file_converter.registry import ConversionRequest, execute
 
 
 def main() -> None:
+    configure_logging()
+
     parser = argparse.ArgumentParser()
     parser.add_argument("source", type=Path)
     parser.add_argument("target_format")
