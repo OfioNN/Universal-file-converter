@@ -4,6 +4,7 @@ from pathlib import Path
 
 from file_converter.converters.structured import csv_to_json, json_to_csv
 from file_converter.converters.text import docx_to_txt, txt_to_docx
+from file_converter.converters.office import document_to_pdf
 from file_converter.errors import ConversionError
 
 CONVERTERS = {
@@ -11,6 +12,8 @@ CONVERTERS = {
     (".json", ".csv"): json_to_csv,
     (".txt", ".docx"): txt_to_docx,
     (".docx", ".txt"): docx_to_txt,
+    (".docx", ".pdf"): document_to_pdf,
+    (".odt", ".pdf"): document_to_pdf,
 }
 
 
