@@ -1,8 +1,9 @@
+import logging
+import shutil
+import time
 from dataclasses import dataclass
 from pathlib import Path
-
-import logging
-import time
+from tempfile import TemporaryDirectory
 
 from file_converter.converters.office import document_to_pdf
 from file_converter.converters.structured import csv_to_json, json_to_csv
@@ -31,10 +32,11 @@ class ConversionRequest:
     target_format: str
     output_dir: Path
     overwrite: bool = False
+    target_name: str | None = None
 
     @property
     def target_path(self) -> Path:
-        return self.output_dir / f"{self.source.stem}{self.target_format}"
+        return self.output_dir / (self.target_name or f"{self.source.stem}{self.target_format}")
 
     def validate(self) -> None:
         if not self.source.is_file():
@@ -48,6 +50,12 @@ class ConversionRequest:
             raise ConversionError(
                 f"Nie można przekonwertować pliku {self.source.suffix} na {self.target_format}. "
                 f"Dostępne formaty dla tego pliku: {targets}."
+            )
+
+        if self.target_path.suffix.lower() != self.target_format:
+            raise ConversionError(
+                f"Plik wynikowy {self.target_path.name} musi mieć rozszerzenie {self.target_format}. "
+                "Popraw nazwę pliku i spróbuj ponownie."
             )
 
         if self.target_path.exists() and not self.overwrite:
@@ -64,7 +72,10 @@ def execute(request: ConversionRequest) -> Path:
     try:
         request.validate()
         convert = REGISTRY[(request.source.suffix.lower(), request.target_format)]
-        target = convert(request.source, request.output_dir)
+        with TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            converted = convert(request.source, Path(temp_dir))
+            shutil.move(converted, request.target_path)
+        target = request.target_path
     except PermissionError as error:
         logger.error(f"{description}: brak dostępu ({error})")
         raise ConversionError(

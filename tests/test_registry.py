@@ -1,9 +1,10 @@
+import json
 from pathlib import Path
 
 import pytest
 
 from file_converter.errors import ConversionError
-from file_converter.registry import ConversionRequest, available_targets
+from file_converter.registry import ConversionRequest, available_targets, execute
 
 
 @pytest.fixture
@@ -42,3 +43,19 @@ def test_validate_rejects_existing_target_without_overwrite(csv_file, tmp_path):
         ConversionRequest(csv_file, ".json", tmp_path).validate()
 
     ConversionRequest(csv_file, ".json", tmp_path, overwrite=True).validate()
+
+
+def test_validate_rejects_target_name_with_wrong_extension(csv_file, tmp_path):
+    with pytest.raises(ConversionError, match="musi mieć rozszerzenie"):
+        ConversionRequest(csv_file, ".json", tmp_path, target_name="wynik.txt").validate()
+
+
+def test_execute_saves_file_under_chosen_name(csv_file, tmp_path):
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    target = execute(ConversionRequest(csv_file, ".json", output_dir, target_name="wynik.json"))
+
+    assert target == output_dir / "wynik.json"
+    assert json.loads(target.read_text(encoding="utf-8")) == [{"name": "Jan"}]
+    assert list(output_dir.iterdir()) == [target]

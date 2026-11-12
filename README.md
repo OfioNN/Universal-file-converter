@@ -63,10 +63,10 @@ Polecenia uruchamia się z głównego folderu projektu, z aktywnym środowiskiem
 python -m file_converter.gui
 ```
 
-1. „Wybierz...” przy polu „Plik wejściowy” – wskazanie pliku do konwersji.
-2. „Wybierz...” przy polu „Folder zapisu” – wskazanie folderu na wynik.
-3. Wybór formatu docelowego z listy; lista zawiera tylko formaty dostępne dla wybranego pliku.
-4. „Konwertuj” – stan pracy widać na pasku statusu; jeśli plik wynikowy istnieje, aplikacja pyta o nadpisanie.
+1. Kliknięcie pola „Wybierz plik” (z symbolem „+”) – wskazanie pliku do konwersji. Po wyborze pole pokazuje ikonę z rozszerzeniem i nazwę pliku; ponowne kliknięcie pozwala wybrać inny plik. Nieobsługiwany plik jest oznaczony na czerwono.
+2. Wybór formatu z listy „Format eksportu”; lista zawiera tylko formaty dostępne dla wybranego pliku.
+3. „Konwertuj” – aplikacja sprawdza wybór (plik, jego istnienie, obsługiwany format) i w razie problemu pokazuje komunikat. Jeśli wszystko się zgadza, otwiera systemowe okno „Zapisz jako” z podpowiedzianą nazwą (np. `people.json`), którą można zmienić; o zastąpieniu istniejącego pliku pyta system.
+4. Stan pracy widać na pasku statusu; wynik i ewentualne błędy są pokazywane w oknie komunikatu w stylu aplikacji.
 
 ### Wiersz poleceń
 
@@ -144,7 +144,7 @@ flowchart TD
     class LO external
 ```
 
-Konwertery nie znają interfejsu, więc nowa para formatów to nowa funkcja `(source: Path, output_dir: Path) -> Path` w folderze `converters/` i jedna linia w słowniku `REGISTRY`; GUI i CLI nie wymagają zmian. GUI uruchamia konwersję w wątku roboczym i co 100 ms sprawdza jej zakończenie, więc okno nie zamarza podczas pracy LibreOffice.
+Konwertery nie znają interfejsu, więc nowa para formatów to nowa funkcja `(source: Path, output_dir: Path) -> Path` w folderze `converters/` i jedna linia w słowniku `REGISTRY`; GUI i CLI nie wymagają zmian. `execute()` uruchamia konwerter w folderze tymczasowym i dopiero gotowy plik przenosi pod docelową ścieżkę: przy błędzie nie zostaje niepełny plik, LibreOffice nie nadpisze innego pliku o tej samej nazwie, a w GUI można wybrać dowolną nazwę pliku wynikowego (pole `target_name` w `ConversionRequest`; CLI używa nazwy pliku źródłowego). GUI uruchamia konwersję w wątku roboczym i co 100 ms sprawdza jej zakończenie, więc okno nie zamarza podczas pracy LibreOffice.
 
 | Plik | Odpowiedzialność |
 | --- | --- |
@@ -167,7 +167,7 @@ Wszystkie przewidziane błędy są zgłaszane jako wspólny wyjątek `Conversion
 | --- | --- | --- |
 | Wejście | istnienie pliku i folderu zapisu; niepuste wybory w GUI | `ConversionRequest.validate()`, `gui.py` |
 | Para formatów | czy para jest w rejestrze; GUI pokazuje tylko dostępne formaty | `validate()`, `available_targets()` |
-| Zapis i nadpisanie | konflikt nazw (pytanie w GUI, opcja `--overwrite` w CLI); brak dostępu do zapisu, np. plik otwarty w Excelu | `validate()`, `execute()` |
+| Zapis i nadpisanie | konflikt nazw (pytanie systemowego okna „Zapisz jako” w GUI, opcja `--overwrite` w CLI); rozszerzenie nazwy pliku wynikowego zgodne z formatem; brak dostępu do zapisu, np. plik otwarty w Excelu | `validate()`, `execute()` |
 | Błędna treść | składnia i struktura JSON, kodowanie inne niż UTF-8, uszkodzony DOCX lub ODT | konwertery |
 | Brak zależności | brak LibreOffice: komunikat z instrukcją instalacji lub ustawienia `LIBREOFFICE_PATH` | `office.py` |
 | Kontrola procesu | limit czasu 60 s, kod zakończenia, istnienie pliku wynikowego | `office.py` |
@@ -198,7 +198,7 @@ Folder `samples/` zawiera 8 plików: poprawne dane z każdej grupy oraz pliki ce
 
 ## Raport testów
 
-Wszystkie 15 testów automatycznych przechodzi, a wszystkie przypadki minimalnej macierzy testów są zaliczone. Logi poniżej pochodzą z uruchomienia projektu na czystym środowisku, przygotowanym dokładnie według sekcji „Instalacja” (Linux, Python 3.12.3, python-docx 1.2.0, LibreOffice 24.2). Projekt był rozwijany i testowany także na Windows z Pythonem 3.14; tam ścieżki w poleceniach zapisuje się z `\`.
+Wszystkie 17 testów automatycznych przechodzi, a wszystkie przypadki minimalnej macierzy testów są zaliczone. Logi poniżej pochodzą z uruchomienia projektu na czystym środowisku, przygotowanym dokładnie według sekcji „Instalacja” (Linux, Python 3.12.3, python-docx 1.2.0, LibreOffice 24.2). Projekt był rozwijany i testowany także na Windows z Pythonem 3.14; tam ścieżki w poleceniach zapisuje się z `\`.
 
 ### Testy automatyczne
 
@@ -212,6 +212,8 @@ Uruchomienie: `python -m pytest -v`. Bez LibreOffice test tworzenia PDF jest pom
 | `test_validate_rejects_missing_file` | brak pliku wejściowego |
 | `test_validate_rejects_unsupported_pair` | nieobsługiwana para formatów |
 | `test_validate_rejects_existing_target_without_overwrite` | konflikt nazw; nadpisanie tylko za zgodą |
+| `test_validate_rejects_target_name_with_wrong_extension` | nazwa pliku wynikowego z rozszerzeniem innym niż format |
+| `test_execute_saves_file_under_chosen_name` | `execute()` zapisuje wynik pod wybraną nazwą i nie zostawia innych plików |
 | `test_csv_json_round_trip_keeps_polish_characters_and_empty_values` | CSV → JSON → CSV: polskie znaki, puste wartości, kolejność kolumn |
 | `test_csv_to_json_detects_semicolon` | CSV ze średnikiem i BOM (Excel) |
 | `test_csv_to_json_accepts_single_column` | CSV z jedną kolumną |
@@ -256,9 +258,9 @@ tests/test_registry.py::test_validate_rejects_existing_target_without_overwrite 
 | --- | --- | --- |
 | Poprawny plik w każdej grupie | CLI (log niżej) i GUI: `people.csv` → JSON, `sample.txt` → DOCX, `formatted.docx` i `notes.odt` → PDF; pliki wynikowe otwierają się poprawnie | zaliczony |
 | Błędny lub uszkodzony plik | CLI (log niżej) i GUI: `broken.json`, `not_a_list.json`, `broken.docx`; komunikat zamiast awarii, GUI działa dalej | zaliczony |
-| Nieobsługiwana para | GUI: dla pliku `.png` lista formatów jest zablokowana, dla `.csv` zawiera tylko `.json`; CLI: `.csv` → `.pdf` odrzucone przed konwersją | zaliczony |
+| Nieobsługiwana para | GUI: dla pliku `.png` lista formatów jest zablokowana, a „Konwertuj” pokazuje komunikat; dla `.csv` lista zawiera tylko JSON; CLI: `.csv` → `.pdf` odrzucone przed konwersją | zaliczony |
 | Brak LibreOffice | `LIBREOFFICE_PATH` ustawione na nieistniejącą ścieżkę, potem konwersja do PDF: komunikat z instrukcją | zaliczony |
-| Plik docelowy już istnieje | GUI pyta o nadpisanie („Nie” niczego nie zmienia); CLI bez `--overwrite` zgłasza konflikt | zaliczony |
+| Plik docelowy już istnieje | GUI: okno „Zapisz jako” pyta o zastąpienie („Nie” niczego nie zmienia); CLI bez `--overwrite` zgłasza konflikt | zaliczony |
 | Polskie znaki i puste wartości | porównanie `people.csv` z wynikiem CSV → JSON → CSV (niżej) | zaliczony |
 
 Log z wiersza poleceń:
@@ -367,7 +369,7 @@ Praca była prowadzona w repozytorium Git; stan po każdym laboratorium oznaczon
 
 | Tag | Zakres |
 | --- | --- |
-| `lab5` | logowanie do pliku, obsługa plików spoza UTF-8 i CSV z jedną kolumną, 15 testów automatycznych, README z raportem testów |
+| `lab5` | dzienne pliki logów, obsługa plików spoza UTF-8 i CSV z jedną kolumną, nowy wygląd GUI z oknem „Zapisz jako”, 17 testów automatycznych, README z raportem testów |
 | `lab4` | rejestr konwerterów z walidacją i polityką nadpisywania, GUI w Tkinter z konwersją w wątku roboczym |
 | `lab3` | TXT ↔ DOCX (python-docx), DOCX/ODT → PDF (LibreOffice), wykrywanie LibreOffice |
 | `lab2` | CSV ↔ JSON, wspólny wyjątek, wiersz poleceń, dane przykładowe, macierz konwersji |
