@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from file_converter.log_config import LOG_FILE, configure_logging
+from file_converter.log_config import ERROR_LOG_FILE, configure_logging
 
 from file_converter.errors import ConversionError
 from file_converter.registry import REGISTRY, ConversionRequest, available_targets, execute
@@ -105,7 +105,7 @@ class ConverterApp(tk.Tk):
             self.status_var.set("Konwersja nie powiodła się.")
             messagebox.showerror(
                 "Nieoczekiwany błąd",
-                f"Wystąpił nieoczekiwany błąd: {error}\nSzczegóły zapisano w pliku {LOG_FILE}.",
+                f"Wystąpił nieoczekiwany błąd: {error}\nSzczegóły zapisano w pliku {ERROR_LOG_FILE}.",
             )
 
 
