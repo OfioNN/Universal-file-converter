@@ -1,1 +1,8 @@
+logs/
 *.log
+__pycache__/
+.pytest_cache/
+.venv/
+.idea/
+output/
+CLAUDE.local.md
