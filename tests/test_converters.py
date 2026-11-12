@@ -43,6 +43,25 @@ def test_csv_to_json_detects_semicolon(tmp_path, output_dir):
     assert json.loads(json_file.read_text(encoding="utf-8")) == [{"name": "Jan", "city": "Łódź"}]
 
 
+def test_csv_to_json_accepts_single_column(tmp_path, output_dir):
+    source = tmp_path / "names.csv"
+    source.write_text("name\nJan\nAnna\n", encoding="utf-8")
+
+    json_file = csv_to_json(source, output_dir)
+
+    assert json.loads(json_file.read_text(encoding="utf-8")) == [{"name": "Jan"}, {"name": "Anna"}]
+
+
+def test_csv_to_json_rejects_non_utf8_file(tmp_path, output_dir):
+    source = tmp_path / "ansi.csv"
+    source.write_text("name;city\nJan;Łódź\n", encoding="cp1250")
+
+    with pytest.raises(ConversionError, match="nie jest zapisany w UTF-8"):
+        csv_to_json(source, output_dir)
+
+    assert not (output_dir / "ansi.json").exists()
+
+
 def test_json_to_csv_rejects_broken_json(tmp_path, output_dir):
     source = tmp_path / "broken.json"
     source.write_text('[{"name": "Jan" "city": "Łódź"}]', encoding="utf-8")

@@ -1,15 +1,31 @@
 import csv
 import json
 from pathlib import Path
+
 from file_converter.errors import ConversionError
+
+
+def not_utf8_error(source: Path) -> ConversionError:
+    return ConversionError(
+        f"Plik {source.name} nie jest zapisany w UTF-8. "
+        "Zapisz go ponownie z kodowaniem UTF-8 i spróbuj jeszcze raz."
+    )
+
 
 def csv_to_json(source: Path, output_dir: Path) -> Path:
     target = output_dir / f"{source.stem}.json"
 
-    with open(source, encoding="utf-8-sig", newline="") as source_file:
-        dialect = csv.Sniffer().sniff(source_file.read(2048), delimiters=",;")
-        source_file.seek(0)
-        rows = list(csv.DictReader(source_file, dialect=dialect))
+    try:
+        with open(source, encoding="utf-8-sig", newline="") as source_file:
+            sample = source_file.read(2048)
+            try:
+                dialect = csv.Sniffer().sniff(sample, delimiters=",;")
+            except csv.Error:
+                dialect = csv.excel
+            source_file.seek(0)
+            rows = list(csv.DictReader(source_file, dialect=dialect))
+    except UnicodeDecodeError as error:
+        raise not_utf8_error(source) from error
 
     with open(target, "w", encoding="utf-8") as target_file:
         json.dump(rows, target_file, ensure_ascii=False, indent=2)
@@ -20,15 +36,17 @@ def csv_to_json(source: Path, output_dir: Path) -> Path:
 def json_to_csv(source: Path, output_dir: Path) -> Path:
     target = output_dir / f"{source.stem}.csv"
 
-    with open(source, encoding="utf-8-sig") as source_file:
-        try:
+    try:
+        with open(source, encoding="utf-8-sig") as source_file:
             rows = json.load(source_file)
-        except json.JSONDecodeError as error:
-            raise ConversionError(
-                f"Plik {source.name} nie jest poprawnym JSON-em "
-                f"(linia {error.lineno}, kolumna {error.colno}). "
-                "Popraw składnię pliku i spróbuj ponownie."
-            ) from error
+    except UnicodeDecodeError as error:
+        raise not_utf8_error(source) from error
+    except json.JSONDecodeError as error:
+        raise ConversionError(
+            f"Plik {source.name} nie jest poprawnym JSON-em "
+            f"(linia {error.lineno}, kolumna {error.colno}). "
+            "Popraw składnię pliku i spróbuj ponownie."
+        ) from error
 
     if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
         raise ConversionError(
@@ -48,12 +66,3 @@ def json_to_csv(source: Path, output_dir: Path) -> Path:
         writer.writerows(rows)
 
     return target
-
-
-if __name__ == "__main__":
-    output_dir = Path("output")
-    output_dir.mkdir(exist_ok=True)
-
-    json_file = csv_to_json(Path("samples/people.csv"), output_dir)
-    csv_file = json_to_csv(json_file, output_dir)
-    print(f"Utworzono: {json_file}, {csv_file}")
